@@ -33,6 +33,8 @@ func main() {
 	r.HandleFunc("/book", service.UpdateBook).Methods("PUT")
 	r.HandleFunc("/book/{id}", service.DeleteBook).Methods("DELETE")
 	r.HandleFunc("/book/{id}", service.FindBookById).Methods("GET")
+	r.HandleFunc("/login", service.Login).Methods("POST")
+	r.HandleFunc("/user", service.RegisterUser).Methods("POST")
 
-	http.ListenAndServe(":80", r)
+	http.ListenAndServe(":8081", r)
 }
