@@ -1,15 +1,24 @@
 package service
 
 import (
+	"encoding/csv"
 	"encoding/json"
+	"fmt"
+	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
+	"os"
+	"strconv"
+	"sync"
 
 	"../models"
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
 )
+
+var wg sync.WaitGroup
 
 func CreateDbConnection() *gorm.DB {
 	db, err := gorm.Open("postgres", "user=postgres dbname=BOOKSHELF sslmode=disable password=admin")
@@ -28,7 +37,18 @@ func AddBook(w http.ResponseWriter, r *http.Request) {
 		db.CreateTable(&models.Book{})
 	}
 	var books []models.Book
-	json.NewDecoder(r.Body).Decode(&books)
+	err := r.ParseMultipartForm(5 * 1024 * 1024)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("Hello")
+	file, handler, err := r.FormFile("fileupload")
+
+	if file == nil {
+		json.NewDecoder(r.Body).Decode(&books)
+	} else {
+		books = parseCsv(file, handler.Filename)
+	}
 	for _, v := range books {
 		var presentBook models.Book
 		db.Where("book_name=?", v.BookName).Find(&presentBook)
@@ -87,4 +107,33 @@ func FindBookById(w http.ResponseWriter, r *http.Request) {
 	}
 	b, _ := json.Marshal(presentBook)
 	w.Write(b)
+}
+func parseCsv(file multipart.File, fileName string) []models.Book {
+	f, err := os.OpenFile(fileName, os.O_RDONLY|os.O_CREATE, 0666)
+
+	io.Copy(f, file)
+	if err != nil {
+		log.Println("Error in opening file")
+	}
+	f.Close()
+	f, err = os.Open("C:\\Users\\gs-1454\\Desktop\\GolagWorkspace\\BookShelf\\src\\booklist.csv")
+	if err != nil {
+		log.Println(err)
+	}
+	defer f.Close()
+	records, _ := csv.NewReader(f).ReadAll()
+	var books []models.Book
+	for _, row := range records {
+		//	for _, detail := range row {
+		//	details := strings.Split(detail, ",")
+		availability, _ := strconv.ParseBool(row[2])
+		book := models.Book{
+			BookName:    row[0],
+			Auther_Name: row[1],
+			IsAvailable: availability,
+		}
+		books = append(books, book)
+	}
+
+	return books
 }
